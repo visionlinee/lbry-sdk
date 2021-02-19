@@ -1060,7 +1060,23 @@ class LBRYElectrumX(SessionBase):
         #     return await self.run_and_cache_query('search', reader.search_to_bytes, kwargs)
 
     async def claimtrie_resolve(self, *urls):
-        raise NotImplemented()
+        rows, extra = [], []
+        for url in urls:
+            print("resolve", url)
+            self.session_mgr.urls_to_resolve_count_metric.inc()
+            stream, channel = await self.db.fs_resolve(url)
+            self.session_mgr.resolved_url_count_metric.inc()
+            if channel and not stream:
+                rows.append(channel)
+                # print("resolved channel", channel.name.decode())
+            elif stream:
+                # print("resolved stream", stream.name.decode())
+                rows.append(stream)
+                if channel:
+                    # print("and channel", channel.name.decode())
+                    extra.append(channel)
+        # print("claimtrie resolve %i rows %i extrat" % (len(rows), len(extra)))
+        return Outputs.to_base64(rows, extra, 0, None, None)
 
     async def get_server_height(self):
         return self.bp.height
