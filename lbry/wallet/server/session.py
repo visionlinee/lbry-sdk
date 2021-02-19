@@ -23,10 +23,12 @@ from prometheus_client import Counter, Info, Histogram, Gauge
 import lbry
 from lbry.utils import LRUCacheWithMetrics
 from lbry.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
+from lbry.schema.result import Outputs
 from lbry.wallet.server.block_processor import LBRYBlockProcessor
-from lbry.wallet.server.db.writer import LBRYLevelDB
-from lbry.wallet.server.db import reader
-from lbry.wallet.server.websocket import AdminWebSocket
+from lbry.wallet.server.leveldb import LevelDB
+# from lbry.wallet.server.db.writer import LBRYLevelDB
+# from lbry.wallet.server.db import reader
+# from lbry.wallet.server.websocket import AdminWebSocket
 from lbry.wallet.server.metrics import ServerLoadData, APICallMetrics
 from lbry.wallet.rpc.framing import NewlineFramer
 import lbry.wallet.server.version as VERSION
@@ -177,7 +179,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: LBRYLevelDB, bp: LBRYBlockProcessor, daemon: 'Daemon', mempool: 'MemPool',
+    def __init__(self, env: 'Env', db: LevelDB, bp: LBRYBlockProcessor, daemon: 'Daemon', mempool: 'MemPool',
                  shutdown_event: asyncio.Event):
         env.max_send = max(350000, env.max_send)
         self.env = env
@@ -571,7 +573,7 @@ class SessionManager:
                 self.logger.info(f'drop clients matching: {self.env.drop_client.pattern}')
             # Start notifications; initialize hsub_results
             await notifications.start(self.db.db_height, self._notify_sessions)
-            await self.start_other()
+            # await self.start_other()
             await self._start_external_servers()
             server_listening_event.set()
             self.bp.status_server.set_available()
@@ -590,7 +592,7 @@ class SessionManager:
                 await asyncio.wait([
                     session.close(force_after=1) for session in self.sessions.values()
                 ])
-            await self.stop_other()
+            # await self.stop_other()
 
     async def start_other(self):
         pass
@@ -808,56 +810,56 @@ class LBRYSessionManager(SessionManager):
         super().__init__(*args, **kwargs)
         self.query_executor = None
         self.websocket = None
-        self.metrics = ServerLoadData()
+        # self.metrics = ServerLoadData()
         self.metrics_loop = None
         self.running = False
-        if self.env.websocket_host is not None and self.env.websocket_port is not None:
-            self.websocket = AdminWebSocket(self)
+        # if self.env.websocket_host is not None and self.env.websocket_port is not None:
+        #     self.websocket = AdminWebSocket(self)
         self.search_cache = self.bp.search_cache
         self.search_cache['search'] = LRUCacheWithMetrics(2 ** 14, metric_name='search', namespace=NAMESPACE)
         self.search_cache['resolve'] = LRUCacheWithMetrics(2 ** 16, metric_name='resolve', namespace=NAMESPACE)
 
-    async def process_metrics(self):
-        while self.running:
-            data = self.metrics.to_json_and_reset({
-                'sessions': self.session_count(),
-                'height': self.db.db_height,
-            })
-            if self.websocket is not None:
-                self.websocket.send_message(data)
-            await asyncio.sleep(1)
+    # async def process_metrics(self):
+    #     while self.running:
+    #         data = self.metrics.to_json_and_reset({
+    #             'sessions': self.session_count(),
+    #             'height': self.db.db_height,
+    #         })
+    #         if self.websocket is not None:
+    #             self.websocket.send_message(data)
+    #         await asyncio.sleep(1)
 
-    async def start_other(self):
-        self.running = True
-        path = os.path.join(self.env.db_dir, 'claims.db')
-        args = dict(
-            initializer=reader.initializer,
-            initargs=(
-                self.logger, path, self.env.coin.NET, self.env.database_query_timeout,
-                self.env.track_metrics, (
-                    self.db.sql.blocked_streams, self.db.sql.blocked_channels,
-                    self.db.sql.filtered_streams, self.db.sql.filtered_channels
-                )
-            )
-        )
-        if self.env.max_query_workers is not None and self.env.max_query_workers == 0:
-            self.query_executor = ThreadPoolExecutor(max_workers=1, **args)
-        else:
-            self.query_executor = ProcessPoolExecutor(
-                max_workers=self.env.max_query_workers or max(os.cpu_count(), 4), **args
-            )
-        if self.websocket is not None:
-            await self.websocket.start()
-        if self.env.track_metrics:
-            self.metrics_loop = asyncio.create_task(self.process_metrics())
+    # async def start_other(self):
+    #     self.running = True
+    #     path = os.path.join(self.env.db_dir, 'claims.db')
+    #     args = dict(
+    #         initializer=reader.initializer,
+    #         initargs=(
+    #             self.logger, path, self.env.coin.NET, self.env.database_query_timeout,
+    #             self.env.track_metrics, (
+    #                 self.db.sql.blocked_streams, self.db.sql.blocked_channels,
+    #                 self.db.sql.filtered_streams, self.db.sql.filtered_channels
+    #             )
+    #         )
+    #     )
+    #     if self.env.max_query_workers is not None and self.env.max_query_workers == 0:
+    #         self.query_executor = ThreadPoolExecutor(max_workers=1, **args)
+    #     else:
+    #         self.query_executor = ProcessPoolExecutor(
+    #             max_workers=self.env.max_query_workers or max(os.cpu_count(), 4), **args
+    #         )
+    #     if self.websocket is not None:
+    #         await self.websocket.start()
+    #     if self.env.track_metrics:
+    #         self.metrics_loop = asyncio.create_task(self.process_metrics())
 
-    async def stop_other(self):
-        self.running = False
-        if self.env.track_metrics:
-            self.metrics_loop.cancel()
-        if self.websocket is not None:
-            await self.websocket.stop()
-        self.query_executor.shutdown()
+    # async def stop_other(self):
+    #     self.running = False
+    #     if self.env.track_metrics:
+    #         self.metrics_loop.cancel()
+    #     if self.websocket is not None:
+    #         await self.websocket.stop()
+    #     self.query_executor.shutdown()
 
 
 class LBRYElectrumX(SessionBase):
@@ -926,7 +928,7 @@ class LBRYElectrumX(SessionBase):
         self.protocol_string = None
         self.daemon = self.session_mgr.daemon
         self.bp: LBRYBlockProcessor = self.session_mgr.bp
-        self.db: LBRYLevelDB = self.bp.db
+        self.db: LevelDB = self.bp.db
 
     @classmethod
     def protocol_min_max_strings(cls):
@@ -983,87 +985,82 @@ class LBRYElectrumX(SessionBase):
         finally:
             self.session_mgr.notifications_in_flight_metric.dec()
 
-    def get_metrics_or_placeholder_for_api(self, query_name):
-        """ Do not hold on to a reference to the metrics
-            returned by this method past an `await` or
-            you may be working with a stale metrics object.
-        """
-        if self.env.track_metrics:
-            return self.session_mgr.metrics.for_api(query_name)
-        else:
-            return APICallMetrics(query_name)
+    # def get_metrics_or_placeholder_for_api(self, query_name):
+    #     """ Do not hold on to a reference to the metrics
+    #         returned by this method past an `await` or
+    #         you may be working with a stale metrics object.
+    #     """
+    #     if self.env.track_metrics:
+    #         # return self.session_mgr.metrics.for_api(query_name)
+    #     else:
+    #         return APICallMetrics(query_name)
 
-    async def run_in_executor(self, query_name, func, kwargs):
-        start = time.perf_counter()
-        try:
-            self.session_mgr.pending_query_metric.inc()
-            result = await asyncio.get_running_loop().run_in_executor(
-                self.session_mgr.query_executor, func, kwargs
-            )
-        except asyncio.CancelledError:
-            raise
-        except reader.SQLiteInterruptedError as error:
-            metrics = self.get_metrics_or_placeholder_for_api(query_name)
-            metrics.query_interrupt(start, error.metrics)
-            self.session_mgr.interrupt_count_metric.inc()
-            raise RPCError(JSONRPC.QUERY_TIMEOUT, 'sqlite query timed out')
-        except reader.SQLiteOperationalError as error:
-            metrics = self.get_metrics_or_placeholder_for_api(query_name)
-            metrics.query_error(start, error.metrics)
-            self.session_mgr.db_operational_error_metric.inc()
-            raise RPCError(JSONRPC.INTERNAL_ERROR, 'query failed to execute')
-        except Exception:
-            log.exception("dear devs, please handle this exception better")
-            metrics = self.get_metrics_or_placeholder_for_api(query_name)
-            metrics.query_error(start, {})
-            self.session_mgr.db_error_metric.inc()
-            raise RPCError(JSONRPC.INTERNAL_ERROR, 'unknown server error')
-        else:
-            if self.env.track_metrics:
-                metrics = self.get_metrics_or_placeholder_for_api(query_name)
-                (result, metrics_data) = result
-                metrics.query_response(start, metrics_data)
-            return base64.b64encode(result).decode()
-        finally:
-            self.session_mgr.pending_query_metric.dec()
-            self.session_mgr.executor_time_metric.observe(time.perf_counter() - start)
+    # async def run_in_executor(self, query_name, func, kwargs):
+    #     start = time.perf_counter()
+    #     try:
+    #         self.session_mgr.pending_query_metric.inc()
+    #         result = await asyncio.get_running_loop().run_in_executor(
+    #             self.session_mgr.query_executor, func, kwargs
+    #         )
+    #     except asyncio.CancelledError:
+    #         raise
+    #     except reader.SQLiteInterruptedError as error:
+    #         metrics = self.get_metrics_or_placeholder_for_api(query_name)
+    #         # metrics.query_interrupt(start, error.metrics)
+    #         self.session_mgr.interrupt_count_metric.inc()
+    #         raise RPCError(JSONRPC.QUERY_TIMEOUT, 'sqlite query timed out')
+    #     except reader.SQLiteOperationalError as error:
+    #         metrics = self.get_metrics_or_placeholder_for_api(query_name)
+    #         # metrics.query_error(start, error.metrics)
+    #         self.session_mgr.db_operational_error_metric.inc()
+    #         raise RPCError(JSONRPC.INTERNAL_ERROR, 'query failed to execute')
+    #     except Exception:
+    #         log.exception("dear devs, please handle this exception better")
+    #         metrics = self.get_metrics_or_placeholder_for_api(query_name)
+    #         metrics.query_error(start, {})
+    #         self.session_mgr.db_error_metric.inc()
+    #         raise RPCError(JSONRPC.INTERNAL_ERROR, 'unknown server error')
+    #     else:
+    #         if self.env.track_metrics:
+    #             metrics = self.get_metrics_or_placeholder_for_api(query_name)
+    #             (result, metrics_data) = result
+    #             metrics.query_response(start, metrics_data)
+    #         return base64.b64encode(result).decode()
+    #     finally:
+    #         self.session_mgr.pending_query_metric.dec()
+    #         self.session_mgr.executor_time_metric.observe(time.perf_counter() - start)
 
-    async def run_and_cache_query(self, query_name, function, kwargs):
-        metrics = self.get_metrics_or_placeholder_for_api(query_name)
-        metrics.start()
-        cache = self.session_mgr.search_cache[query_name]
-        cache_key = str(kwargs)
-        cache_item = cache.get(cache_key)
-        if cache_item is None:
-            cache_item = cache[cache_key] = ResultCacheItem()
-        elif cache_item.result is not None:
-            metrics.cache_response()
-            return cache_item.result
-        async with cache_item.lock:
-            if cache_item.result is None:
-                cache_item.result = await self.run_in_executor(
-                    query_name, function, kwargs
-                )
-            else:
-                metrics = self.get_metrics_or_placeholder_for_api(query_name)
-                metrics.cache_response()
-            return cache_item.result
+    # async def run_and_cache_query(self, query_name, function, kwargs):
+    #     metrics = self.get_metrics_or_placeholder_for_api(query_name)
+    #     metrics.start()
+    #     cache = self.session_mgr.search_cache[query_name]
+    #     cache_key = str(kwargs)
+    #     cache_item = cache.get(cache_key)
+    #     if cache_item is None:
+    #         cache_item = cache[cache_key] = ResultCacheItem()
+    #     elif cache_item.result is not None:
+    #         metrics.cache_response()
+    #         return cache_item.result
+    #     async with cache_item.lock:
+    #         if cache_item.result is None:
+    #             cache_item.result = await self.run_in_executor(
+    #                 query_name, function, kwargs
+    #             )
+    #         else:
+    #             metrics = self.get_metrics_or_placeholder_for_api(query_name)
+    #             metrics.cache_response()
+    #         return cache_item.result
 
     async def mempool_compact_histogram(self):
         return self.mempool.compact_fee_histogram()
 
     async def claimtrie_search(self, **kwargs):
-        if kwargs:
-            return await self.run_and_cache_query('search', reader.search_to_bytes, kwargs)
+        raise NotImplemented()
+        # if kwargs:
+        #     return await self.run_and_cache_query('search', reader.search_to_bytes, kwargs)
 
     async def claimtrie_resolve(self, *urls):
-        if urls:
-            count = len(urls)
-            try:
-                self.session_mgr.urls_to_resolve_count_metric.inc(count)
-                return await self.run_and_cache_query('resolve', reader.resolve_to_bytes, urls)
-            finally:
-                self.session_mgr.resolved_url_count_metric.inc(count)
+        raise NotImplemented()
 
     async def get_server_height(self):
         return self.bp.height

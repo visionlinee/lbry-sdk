@@ -791,43 +791,43 @@ class LBRYBlockProcessor(BlockProcessor):
             self.prefetcher.polling_delay = 0.5
         self.should_validate_signatures = self.env.boolean('VALIDATE_CLAIM_SIGNATURES', False)
         self.logger.info(f"LbryumX Block Processor - Validating signatures: {self.should_validate_signatures}")
-        self.sql: SQLDB = self.db.sql
-        self.timer = Timer('BlockProcessor')
+        # self.sql: SQLDB = self.db.sql
+        # self.timer = Timer('BlockProcessor')
 
-    def advance_blocks(self, blocks):
-        self.sql.begin()
-        try:
-            self.timer.run(super().advance_blocks, blocks)
-        except:
-            self.logger.exception(f'Error while advancing transaction in new block.')
-            raise
-        finally:
-            self.sql.commit()
-        if self.db.first_sync and self.height == self.daemon.cached_height():
-            self.timer.run(self.sql.execute, self.sql.SEARCH_INDEXES, timer_name='executing SEARCH_INDEXES')
-            if self.env.individual_tag_indexes:
-                self.timer.run(self.sql.execute, self.sql.TAG_INDEXES, timer_name='executing TAG_INDEXES')
-            self.timer.run(self.sql.execute, self.sql.LANGUAGE_INDEXES, timer_name='executing LANGUAGE_INDEXES')
+    # def advance_blocks(self, blocks):
+    #     self.sql.begin()
+    #     try:
+    #         self.timer.run(super().advance_blocks, blocks)
+    #     except:
+    #         self.logger.exception(f'Error while advancing transaction in new block.')
+    #         raise
+    #     finally:
+    #         self.sql.commit()
+    #     if self.db.first_sync and self.height == self.daemon.cached_height():
+    #         self.timer.run(self.sql.execute, self.sql.SEARCH_INDEXES, timer_name='executing SEARCH_INDEXES')
+    #         if self.env.individual_tag_indexes:
+    #             self.timer.run(self.sql.execute, self.sql.TAG_INDEXES, timer_name='executing TAG_INDEXES')
+    #         self.timer.run(self.sql.execute, self.sql.LANGUAGE_INDEXES, timer_name='executing LANGUAGE_INDEXES')
 
-    def advance_txs(self, height, txs, header, block_hash):
-        timer = self.timer.sub_timers['advance_blocks']
-        undo = timer.run(super().advance_txs, height, txs, header, block_hash, timer_name='super().advance_txs')
-        timer.run(self.sql.advance_txs, height, txs, header, self.daemon.cached_height(), forward_timer=True)
-        if (height % 10000 == 0 or not self.db.first_sync) and self.logger.isEnabledFor(10):
-            self.timer.show(height=height)
-        return undo
+    # def advance_txs(self, height, txs, header, block_hash):
+    #     timer = self.timer.sub_timers['advance_blocks']
+    #     undo = timer.run(super().advance_txs, height, txs, header, block_hash, timer_name='super().advance_txs')
+    #     timer.run(self.sql.advance_txs, height, txs, header, self.daemon.cached_height(), forward_timer=True)
+    #     if (height % 10000 == 0 or not self.db.first_sync) and self.logger.isEnabledFor(10):
+    #         self.timer.show(height=height)
+    #     return undo
 
-    def _checksig(self, value, address):
-        try:
-            claim_dict = Claim.from_bytes(value)
-            cert_id = claim_dict.signing_channel_hash
-            if not self.should_validate_signatures:
-                return cert_id
-            if cert_id:
-                cert_claim = self.db.get_claim_info(cert_id)
-                if cert_claim:
-                    certificate = Claim.from_bytes(cert_claim.value)
-                    claim_dict.validate_signature(address, certificate)
-                    return cert_id
-        except Exception:
-            pass
+    # def _checksig(self, value, address):
+    #     try:
+    #         claim_dict = Claim.from_bytes(value)
+    #         cert_id = claim_dict.signing_channel_hash
+    #         if not self.should_validate_signatures:
+    #             return cert_id
+    #         if cert_id:
+    #             cert_claim = self.db.get_claim_info(cert_id)
+    #             if cert_claim:
+    #                 certificate = Claim.from_bytes(cert_claim.value)
+    #                 claim_dict.validate_signature(address, certificate)
+    #                 return cert_id
+    #     except Exception:
+    #         pass
