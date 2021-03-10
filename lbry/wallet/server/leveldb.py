@@ -37,6 +37,8 @@ from lbry.wallet.server.db import DB_PREFIXES
 from lbry.wallet.server.db.prefixes import Prefixes
 from lbry.wallet.server.db.claimtrie import StagedClaimtrieItem, get_update_effective_amount_ops, length_encoded_name
 from lbry.wallet.server.db.claimtrie import get_expiration_height
+
+
 class UTXO(typing.NamedTuple):
     tx_num: int
     tx_pos: int
