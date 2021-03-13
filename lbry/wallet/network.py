@@ -261,7 +261,7 @@ class Network:
         fastest_spvs = await self.get_n_fastest_spvs()
         for (host, port) in fastest_spvs:
 
-            client = ClientSession(network=self, server=(host, port))
+            client = ClientSession(network=self, server=(host, port), timeout=self.config['hub_timeout'])
             try:
                 await client.create_connection()
                 log.warning("Connected to spv server %s:%i", host, port)
