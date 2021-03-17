@@ -131,6 +131,15 @@ class ReconnectTests(IntegrationTestCase):
         # omg, the burned cable still works! torba is fire proof!
         await self.ledger.network.get_transaction(sendtxid)
 
+    async def test_call_flood(self):
+        self.ledger.network.client.timeout = 1
+        address = await self.manager.get_unused_address()
+        calls = [self.ledger.network.subscribe_address(address) for _ in range(5000)]
+        try:
+            await asyncio.gather(*calls)
+        except:
+            self.fail("flood of calls caused client to disconnect")
+
     async def test_timeout_then_reconnect(self):
         # tests that it connects back after some failed attempts
         await self.conductor.spv_node.stop()
