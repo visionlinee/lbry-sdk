@@ -84,7 +84,7 @@ class AsyncioTestCase(unittest.TestCase):
     #  https://bugs.python.org/issue32972
 
     LOOP_SLOW_CALLBACK_DURATION = 0.2
-    TIMEOUT = 60.0
+    TIMEOUT = 120.0
 
     maxDiff = None
 
