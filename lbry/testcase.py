@@ -138,7 +138,8 @@ class AsyncioTestCase(unittest.TestCase):
                 with outcome.testPartExecutor(self, isTest=True):
                     maybe_coroutine = testMethod()
                     if asyncio.iscoroutine(maybe_coroutine):
-                        self.loop.call_later(self.TIMEOUT, self.cancel)
+                        if self.TIMEOUT:
+                            self.loop.call_later(self.TIMEOUT, self.cancel)
                         self.loop.run_until_complete(maybe_coroutine)
                 outcome.expecting_failure = False
                 with outcome.testPartExecutor(self):
